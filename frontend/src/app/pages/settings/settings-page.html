@@ -1,0 +1,115 @@
+<section class="wrap">
+  <header class="page-head">
+    <div>
+      <h1>Настройки</h1>
+      <p class="sub">API-ключи провайдеров и поведение умного роутера</p>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn" (click)="cancel()" [disabled]="!dirty()">Отмена</button>
+      <button type="button" class="btn primary" (click)="save()" [disabled]="!dirty() || saving() === 'settings'"><app-icon name="check" />Сохранить</button>
+    </div>
+  </header>
+
+  <div class="sgrid">
+    <section class="panel glass">
+      <div class="pn-h">
+        <h2><app-icon name="key" />API-ключи</h2>
+        <button type="button" class="btn sm" (click)="dialogOpen.set(true)"><app-icon name="plus" />Модель</button>
+      </div>
+      @switch (backend.online()) {
+        @case (true) {
+          <p class="kbanner ok"><app-icon name="check" />Бэкенд подключён: ключи сохраняются на нём и сразу используются роутером. Больше нигде их задавать не нужно.</p>
+        }
+        @case (false) {
+          <p class="kbanner warn"><app-icon name="bolt" />Бэкенд не запущен. Ключи сохранятся в браузере и автоматически отправятся на сервер, когда он запустится.</p>
+        }
+        @default {
+          <p class="kbanner"><app-icon name="route" />Проверяю связь с бэкендом…</p>
+        }
+      }
+      <div class="kfilter">
+        <label class="search glass">
+          <app-icon name="search" />
+          <span class="sr-only">Поиск провайдера</span>
+          <input type="search" placeholder="Поиск провайдера…" [value]="pq()" (input)="pq.set($any($event.target).value)" />
+        </label>
+        <button type="button" class="chip sm" [class.on]="onlyKeyed()" (click)="onlyKeyed.set(!onlyKeyed())">С ключом · {{ keyedCount() }}</button>
+      </div>
+
+      <div class="klist">
+        @for (p of providerRows(); track p.name) {
+          <div class="krow">
+            <span class="av sm" [style.--c]="p.color">{{ p.name[0] }}</span>
+            <div class="kname">
+              <b [title]="p.name">{{ p.name }}</b>
+              <small>
+                @if (p.cascade.length) { в каскаде: {{ p.cascade.join(', ') }} } @else { {{ p.count }} {{ plural(p.count) }} }
+                @if (p.url) { · <a [href]="p.url" target="_blank" rel="noopener noreferrer">получить ключ</a> }
+              </small>
+            </div>
+            @if (editing() === p.name) {
+              <div class="kedit">
+                <input class="input mono" [ngModel]="keyDraft()" (ngModelChange)="keyDraft.set($event)" (keydown.enter)="saveKey(p.name)" (keydown.escape)="editing.set(null)"
+                       [placeholder]="keyPlaceholder(p.name)" spellcheck="false" autocomplete="off" aria-label="API-ключ" />
+                <button type="button" class="ib ok" (click)="saveKey(p.name)" [disabled]="saving() === p.name" aria-label="Сохранить ключ"><app-icon name="check" /></button>
+                <button type="button" class="ib" (click)="editing.set(null)" aria-label="Отмена"><app-icon name="x" /></button>
+              </div>
+            } @else {
+              <div class="kfield">
+                <code [title]="p.hint">{{ p.key ? (revealed().has(p.name) ? p.key : maskKey(p.key)) : p.hint || 'ключ не указан' }}</code>
+                <span class="kact">
+                  @if (p.key) {
+                    <button type="button" class="ib" (click)="reveal(p.name)" [attr.aria-label]="revealed().has(p.name) ? 'Скрыть ключ' : 'Показать ключ'"><app-icon [name]="revealed().has(p.name) ? 'eyeOff' : 'eye'" /></button>
+                  }
+                  <button type="button" class="ib" (click)="startEdit(p.name)" [attr.aria-label]="p.key ? 'Изменить ключ' : 'Добавить ключ'"><app-icon [name]="p.key ? 'edit' : 'plus'" /></button>
+                </span>
+              </div>
+            }
+            <span class="st" [class]="p.cls" [title]="p.hint">{{ p.label }}</span>
+          </div>
+        } @empty {
+          <p class="muted">Ничего не найдено.</p>
+        }
+      </div>
+    </section>
+
+    <section class="panel glass router">
+      <div class="pn-h"><h2><app-icon name="route" />Умный роутер</h2><button type="button" class="btn sm" (click)="resetDefaults()">По умолчанию</button></div>
+
+      <button type="button" class="opt" (click)="flip('autoSwitch')" role="switch" [attr.aria-checked]="draft().autoSwitch">
+        <div><b>Автопереключение при лимите</b><small>При 429 / исчерпанной квоте переходить на резервную модель; выключено — отвечает только первая</small></div>
+        <span class="toggle" [class.on]="draft().autoSwitch"></span>
+      </button>
+
+      <div class="opt static" [class.dim]="!draft().autoSwitch">
+        <div><b>Порог переключения</b><small>Переключать заранее, при достижении этого процента лимита</small></div>
+        <span class="pill">{{ draft().threshold }}%</span>
+      </div>
+      <input type="range" class="range" min="50" max="100" step="1" aria-label="Порог переключения"
+             [disabled]="!draft().autoSwitch" [value]="draft().threshold" [style.--v]="((draft().threshold - 50) * 2) + '%'"
+             (input)="set('threshold', +$any($event.target).value)" />
+
+      <div class="opt static"><div><b>Стратегия выбора</b><small>{{ strategyHint() }}</small></div></div>
+      <div class="seg full" role="radiogroup" aria-label="Стратегия выбора">
+        @for (s of strategies; track s.id) {
+          <button type="button" role="radio" [attr.aria-checked]="draft().strategy === s.id" [class.on]="draft().strategy === s.id" (click)="set('strategy', s.id)">{{ s.label }}</button>
+        }
+      </div>
+
+      @for (t of toggles; track t.key) {
+        <button type="button" class="opt" (click)="flip(t.key)" role="switch" [attr.aria-checked]="draft()[t.key]">
+          <div><b>{{ t.title }}</b><small>{{ t.key === 'encryptKeys' ? encryptHint() : t.hint }}</small></div>
+          <span class="toggle" [class.on]="draft()[t.key]"></span>
+        </button>
+      }
+    </section>
+  </div>
+</section>
+
+@if (dialogOpen()) {
+  <app-add-model-dialog (closed)="dialogOpen.set(false)" />
+}
+
+@if (toast()) {
+  <div class="toast" role="status"><app-icon name="check" />{{ toast() }}</div>
+}

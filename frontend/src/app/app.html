@@ -1,0 +1,35 @@
+<header class="topbar glass">
+  <a class="brand" routerLink="/chat" aria-label="infinityAI — на главную">
+    <span class="logo">∞</span>
+    <span class="bname">infinity<b class="grad-text">AI</b></span>
+  </a>
+
+  <nav class="nav" aria-label="Разделы">
+    @for (item of nav; track item.path) {
+      <a class="nl" [routerLink]="item.path" routerLinkActive="on" #rla="routerLinkActive" [attr.aria-current]="rla.isActive ? 'page' : null">
+        <app-icon [name]="item.icon" />
+        <span>{{ item.label }}</span>
+      </a>
+    }
+  </nav>
+
+  <a class="router-pill glass" routerLink="/models" title="Состояние умного роутера">
+    <app-icon name="route" />
+    <b>Умный роутер</b>
+    <i class="dot" [class.warn]="models.activeCount() === 0"></i>
+    <span class="muted">Готово {{ models.activeCount() }} из {{ models.withKeyCount() }} с ключом</span>
+  </a>
+
+  <div class="seg theme" role="group" aria-label="Тема оформления">
+    <button type="button" [class.on]="theme.theme() === 'light'" (click)="theme.set('light')" [attr.aria-pressed]="theme.theme() === 'light'">
+      <app-icon name="sun" /><span>Светлая</span>
+    </button>
+    <button type="button" [class.on]="theme.theme() === 'dark'" (click)="theme.set('dark')" [attr.aria-pressed]="theme.theme() === 'dark'">
+      <app-icon name="moon" /><span>Тёмная</span>
+    </button>
+  </div>
+</header>
+
+<main class="page">
+  <router-outlet />
+</main>
